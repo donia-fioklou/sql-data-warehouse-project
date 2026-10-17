@@ -1,61 +1,60 @@
-# Data Catalog for Gold Layer
+# Catalogue des données — couche Gold
 
-## Overview
-The Gold Layer is the business-level data representation, structured to support analytical and reporting use cases. It consists of **dimension tables** and **fact tables** for specific business metrics.
+## Présentation
 
----
+La couche Gold expose des vues destinées à l’analyse et au reporting. Elle rassemble les données nettoyées des sources CRM et ERP dans un modèle en étoile comprenant deux dimensions et une table de faits.
 
-### 1. **gold.dim_customers**
-- **Purpose:** Stores customer details enriched with demographic and geographic data.
-- **Columns:**
+Les clés `customer_key` et `product_key` sont calculées à la volée par `ROW_NUMBER()` dans les vues. Ce sont des clés de substitution générées à la lecture, et non des colonnes stockées dans des tables Gold physiques.
 
-| Column Name      | Data Type     | Description                                                                                   |
-|------------------|---------------|-----------------------------------------------------------------------------------------------|
-| customer_key     | INT           | Surrogate key uniquely identifying each customer record in the dimension table.               |
-| customer_id      | INT           | Unique numerical identifier assigned to each customer.                                        |
-| customer_number  | NVARCHAR(50)  | Alphanumeric identifier representing the customer, used for tracking and referencing.         |
-| first_name       | NVARCHAR(50)  | The customer's first name, as recorded in the system.                                         |
-| last_name        | NVARCHAR(50)  | The customer's last name or family name.                                                     |
-| country          | NVARCHAR(50)  | The country of residence for the customer (e.g., 'Australia').                               |
-| marital_status   | NVARCHAR(50)  | The marital status of the customer (e.g., 'Married', 'Single').                              |
-| gender           | NVARCHAR(50)  | The gender of the customer (e.g., 'Male', 'Female', 'n/a').                                  |
-| birthdate        | DATE          | The date of birth of the customer, formatted as YYYY-MM-DD (e.g., 1971-10-06).               |
-| create_date      | DATE          | The date and time when the customer record was created in the system|
+## `gold.dim_customers`
 
----
+**Rôle :** une ligne par client issu du CRM, enrichie avec les données démographiques et géographiques disponibles dans l’ERP.
 
-### 2. **gold.dim_products**
-- **Purpose:** Provides information about the products and their attributes.
-- **Columns:**
+| Colonne | Type SQL | Description |
+|---|---|---|
+| `customer_key` | `BIGINT` | Clé de substitution générée par la vue pour les jointures analytiques. |
+| `customer_id` | `INT` | Identifiant du client provenant du CRM. |
+| `customer_number` | `NVARCHAR(50)` | Identifiant métier du client (`cst_key`). |
+| `first_name` | `NVARCHAR(50)` | Prénom du client. |
+| `last_name` | `NVARCHAR(50)` | Nom de famille du client. |
+| `country` | `NVARCHAR(50)` | Pays issu des données de localisation ERP, s’il est disponible. |
+| `marital_status` | `NVARCHAR(50)` | Statut marital standardisé dans Silver. |
+| `gender` | `NVARCHAR(50)` | Genre ; la valeur CRM est privilégiée et la valeur ERP sert de repli. |
+| `birthdate` | `DATE` | Date de naissance issue des données client ERP. |
+| `create_date` | `DATE` | Date de création de l’enregistrement client dans le CRM. |
 
-| Column Name         | Data Type     | Description                                                                                   |
-|---------------------|---------------|-----------------------------------------------------------------------------------------------|
-| product_key         | INT           | Surrogate key uniquely identifying each product record in the product dimension table.         |
-| product_id          | INT           | A unique identifier assigned to the product for internal tracking and referencing.            |
-| product_number      | NVARCHAR(50)  | A structured alphanumeric code representing the product, often used for categorization or inventory. |
-| product_name        | NVARCHAR(50)  | Descriptive name of the product, including key details such as type, color, and size.         |
-| category_id         | NVARCHAR(50)  | A unique identifier for the product's category, linking to its high-level classification.     |
-| category            | NVARCHAR(50)  | The broader classification of the product (e.g., Bikes, Components) to group related items.  |
-| subcategory         | NVARCHAR(50)  | A more detailed classification of the product within the category, such as product type.      |
-| maintenance_required| NVARCHAR(50)  | Indicates whether the product requires maintenance (e.g., 'Yes', 'No').                       |
-| cost                | INT           | The cost or base price of the product, measured in monetary units.                            |
-| product_line        | NVARCHAR(50)  | The specific product line or series to which the product belongs (e.g., Road, Mountain).      |
-| start_date          | DATE          | The date when the product became available for sale or use, stored in|
+## `gold.dim_products`
 
----
+**Rôle :** une ligne par produit actuellement retenu, enrichie avec sa catégorie et sa sous-catégorie ERP. La vue exclut les versions de produits dont `prd_end_dt` n’est pas nul.
 
-### 3. **gold.fact_sales**
-- **Purpose:** Stores transactional sales data for analytical purposes.
-- **Columns:**
+| Colonne | Type SQL | Description |
+|---|---|---|
+| `product_key` | `BIGINT` | Clé de substitution générée par la vue pour les jointures analytiques. |
+| `product_id` | `INT` | Identifiant du produit provenant du CRM. |
+| `product_number` | `NVARCHAR(50)` | Identifiant métier du produit (`prd_key`). |
+| `product_name` | `NVARCHAR(50)` | Nom du produit. |
+| `category_id` | `NVARCHAR(50)` | Identifiant de catégorie issu des données CRM transformées. |
+| `category` | `NVARCHAR(50)` | Catégorie du produit issue de l’ERP. |
+| `subcategory` | `NVARCHAR(50)` | Sous-catégorie du produit issue de l’ERP. |
+| `maintenance` | `NVARCHAR(50)` | Indicateur de maintenance provenant de la classification ERP. |
+| `cost` | `INT` | Coût du produit dans les données CRM. |
+| `product_line` | `NVARCHAR(50)` | Ligne de produit standardisée dans Silver. |
+| `start_date` | `DATE` | Date de début de la version de produit. |
 
-| Column Name     | Data Type     | Description                                                                                   |
-|-----------------|---------------|-----------------------------------------------------------------------------------------------|
-| order_number    | NVARCHAR(50)  | A unique alphanumeric identifier for each sales order (e.g., 'SO54496').                      |
-| product_key     | INT           | Surrogate key linking the order to the product dimension table.                               |
-| customer_key    | INT           | Surrogate key linking the order to the customer dimension table.                              |
-| order_date      | DATE          | The date when the order was placed.                                                           |
-| shipping_date   | DATE          | The date when the order was shipped to the customer.                                          |
-| due_date        | DATE          | The date when the order payment was due.                                                      |
-| sales_amount    | INT           | The total monetary value of the sale for the line item, in whole currency units (e.g., 25).   |
-| quantity        | INT           | The number of units of the product ordered for the line item (e.g., 1).                       |
-| price           | INT           | The price per unit of the product for the line item, in whole currency units (e.g., 25).      |
+## `gold.fact_sales`
+
+**Rôle :** une ligne par ligne de vente issue de `crm_sales_details`. Les clés client et produit relient chaque vente aux dimensions Gold.
+
+| Colonne | Type SQL | Description |
+|---|---|---|
+| `order_number` | `NVARCHAR(50)` | Numéro de commande. |
+| `product_key` | `BIGINT` | Clé de la dimension produit correspondante, si trouvée. |
+| `customer_key` | `BIGINT` | Clé de la dimension client correspondante, si trouvée. |
+| `order_date` | `DATE` | Date de commande. |
+| `shipping_date` | `DATE` | Date d’expédition. |
+| `due_date` | `DATE` | Date d’échéance. |
+| `sales_amount` | `INT` | Montant des ventes pour la ligne de commande. |
+| `quantity` | `INT` | Quantité vendue. |
+| `price` | `INT` | Prix unitaire de la ligne de vente. |
+
+Les trois vues sont définies dans [`scripts/gold/ddl_gold.sql`](../scripts/gold/ddl_gold.sql). Les contrôles portant sur leur intégrité sont disponibles dans [`tests/quality_checks_gold.sql`](../tests/quality_checks_gold.sql).

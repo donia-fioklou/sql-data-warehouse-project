@@ -1,105 +1,119 @@
+# Entrepôt de données SQL — projet de Donia
 
-# Data Warehouse and Analytics Project
+> Projet personnel d’apprentissage en ingénierie des données, réalisé avec SQL Server.
 
-Welcome to the **Data Warehouse and Analytics Project** repository! 🚀  
-This project demonstrates a comprehensive data warehousing and analytics solution, from building a data warehouse to generating actionable insights. Designed as a portfolio project, it highlights industry best practices in data engineering and analytics.
+**Autrice :** donia-fioklou
 
----
-## 🏗️ Data Architecture
+J’ai réalisé ce projet pour apprendre et pratiquer les étapes de construction d’un entrepôt de données : chargement de fichiers CSV, nettoyage et intégration de données, modélisation analytique et contrôles qualité. Le projet s’appuie sur deux sources, CRM et ERP, et organise les données selon les couches Bronze, Silver et Gold.
 
-The data architecture for this project follows Medallion Architecture **Bronze**, **Silver**, and **Gold** layers:
-![Data Architecture](docs/data_architecture.png)
+Cette réalisation s’inspire du projet pédagogique de **Data With Baraa**. Le code et la documentation de ce dépôt correspondent à mon travail d’apprentissage et à mon adaptation du projet.
 
-1. **Bronze Layer**: Stores raw data as-is from the source systems. Data is ingested from CSV Files into SQL Server Database.
-2. **Silver Layer**: This layer includes data cleansing, standardization, and normalization processes to prepare data for analysis.
-3. **Gold Layer**: Houses business-ready data modeled into a star schema required for reporting and analytics.
+## Architecture
 
----
-## 📖 Project Overview
+Les scripts SQL Server mettent en place trois couches :
 
-This project involves:
+1. **Bronze** — chargement des CSV sources sans transformation métier majeure.
+2. **Silver** — nettoyage, standardisation et harmonisation des données CRM et ERP.
+3. **Gold** — trois vues analytiques organisées en modèle en étoile : `dim_customers`, `dim_products` et `fact_sales`.
 
-1. **Data Architecture**: Designing a Modern Data Warehouse Using Medallion Architecture **Bronze**, **Silver**, and **Gold** layers.
-2. **ETL Pipelines**: Extracting, transforming, and loading data from source systems into the warehouse.
-3. **Data Modeling**: Developing fact and dimension tables optimized for analytical queries.
-4. **Analytics & Reporting**: Creating SQL-based reports and dashboards for actionable insights.
+![Architecture des données](docs/data_architecture.png)
 
-🎯 This repository is an excellent resource for professionals and students looking to showcase expertise in:
-- SQL Development
-- Data Architect
-- Data Engineering  
-- ETL Pipeline Developer  
-- Data Modeling  
-- Data Analytics  
+Le flux des données est illustré dans [le diagramme de flux](docs/data_flow.png). Le détail des colonnes Gold est disponible dans le [catalogue de données](docs/data_catalog.md).
 
----
+## Ce que contient le projet
 
-## 🛠️ Important Links & Tools:
+- Une base SQL Server créée avec les schémas `bronze`, `silver` et `gold`.
+- Des tables Bronze et Silver pour les fichiers CRM et ERP.
+- Des procédures de chargement Bronze et Silver, avec transformations et standardisations dans Silver.
+- Des vues Gold pour l’analyse des clients, des produits et des ventes.
+- Des requêtes de contrôle qualité pour les couches Silver et Gold.
+- Des notes et diagrammes de conception dans `docs/`.
 
-Everything is for Free!
-- **[Datasets](datasets/):** Access to the project dataset (csv files).
-- **[SQL Server Express](https://www.microsoft.com/en-us/sql-server/sql-server-downloads):** Lightweight server for hosting your SQL database.
-- **[SQL Server Management Studio (SSMS)](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms?view=sql-server-ver16):** GUI for managing and interacting with databases.
-- **[Git Repository](https://github.com/):** Set up a GitHub account and repository to manage, version, and collaborate on your code efficiently.
-- **[DrawIO](https://www.drawio.com/):** Design data architecture, models, flows, and diagrams.
-- **[Notion](https://www.notion.com/):** All-in-one tool for project management and organization.
-- **[Notion Project Steps](https://thankful-pangolin-2ca.notion.site/SQL-Data-Warehouse-Project-16ed041640ef80489667cfe2f380b269?pvs=4):** Access to All Project Phases and Tasks.
+Le modèle Gold est destiné à faciliter les analyses de ventes, de produits et de clients. Ce dépôt ne contient pas de tableau de bord BI ni de rapports d’analyse prêts à l’emploi.
 
----
+## Technologies et prérequis
 
-## 🚀 Project Requirements
+- Microsoft SQL Server.
+- SQL Server Management Studio (SSMS), ou un outil compatible pour exécuter les scripts T-SQL.
+- Accès en lecture aux fichiers CSV depuis le service SQL Server pour utiliser `BULK INSERT`.
 
-### Building the Data Warehouse (Data Engineering)
+## Exécution
 
-#### Objective
-Develop a modern data warehouse using SQL Server to consolidate sales data, enabling analytical reporting and informed decision-making.
+### 1. Vérifier les chemins des CSV
 
-#### Specifications
-- **Data Sources**: Import data from two source systems (ERP and CRM) provided as CSV files.
-- **Data Quality**: Cleanse and resolve data quality issues prior to analysis.
-- **Integration**: Combine both sources into a single, user-friendly data model designed for analytical queries.
-- **Scope**: Focus on the latest dataset only; historization of data is not required.
-- **Documentation**: Provide clear documentation of the data model to support both business stakeholders and analytics teams.
+La procédure `bronze.load_bronze`, dans `scripts/bronze/proc_load_bronze.sql`, contient des chemins absolus propres à une machine. Avant de la créer ou de l’exécuter, remplace ces chemins par ceux des fichiers CSV dans ton environnement. Le compte de service SQL Server doit pouvoir lire ces fichiers.
 
----
+### 2. Créer la base et les objets
 
-### BI: Analytics & Reporting (Data Analysis)
+Dans SSMS, exécute les scripts dans cet ordre :
 
-#### Objective
-Develop SQL-based analytics to deliver detailed insights into:
-- **Customer Behavior**
-- **Product Performance**
-- **Sales Trends**
+1. `scripts/init_database.sql`
+2. `scripts/bronze/ddl_bronze.sql`
+3. `scripts/silver/ddl_silver.sql`
+4. `scripts/bronze/proc_load_bronze.sql`
+5. `scripts/silver/proc_load_silver.sql`
+6. `scripts/gold/ddl_gold.sql`
 
-These insights empower stakeholders with key business metrics, enabling strategic decision-making.  
+> **Attention :** `scripts/init_database.sql` supprime puis recrée la base `DataWarehouse` si elle existe déjà. Cette opération efface les données qu’elle contient.
 
-For more details, refer to [docs/requirements.md](docs/requirements.md).
+### 3. Charger les données
 
-## 📂 Repository Structure
-```
-data-warehouse-project/
-│
-├── datasets/                           # Raw datasets used for the project (ERP and CRM data)
-│
-├── docs/                               # Project documentation and architecture details
-│   ├── etl.drawio                      # Draw.io file shows all different techniquies and methods of ETL
-│   ├── data_architecture.drawio        # Draw.io file shows the project's architecture
-│   ├── data_catalog.md                 # Catalog of datasets, including field descriptions and metadata
-│   ├── data_flow.drawio                # Draw.io file for the data flow diagram
-│   ├── data_models.drawio              # Draw.io file for data models (star schema)
-│   ├── naming-conventions.md           # Consistent naming guidelines for tables, columns, and files
-│
-├── scripts/                            # SQL scripts for ETL and transformations
-│   ├── bronze/                         # Scripts for extracting and loading raw data
-│   ├── silver/                         # Scripts for cleaning and transforming data
-│   ├── gold/                           # Scripts for creating analytical models
-│
-├── tests/                              # Test scripts and quality files
-│
-├── README.md                           # Project overview and instructions
-├── LICENSE                             # License information for the repository
-├── .gitignore                          # Files and directories to be ignored by Git
-└── requirements.txt                    # Dependencies and requirements for the project
+Après avoir configuré les chemins CSV, exécute les procédures dans l’ordre :
+
+```sql
+EXEC bronze.load_bronze;
+EXEC silver.load_silver;
 ```
 
+Les vues Gold sont définies dans `scripts/gold/ddl_gold.sql`. Une fois les couches chargées, tu peux les interroger, par exemple :
 
+```sql
+SELECT TOP (10) *
+FROM gold.fact_sales;
+```
+
+Les procédures vident leurs tables cibles avant chaque chargement. Relancer un chargement remplace donc les données déjà présentes dans la couche concernée.
+
+### 4. Vérifier la qualité des données
+
+Après les chargements, exécute les requêtes de `tests/quality_checks_silver.sql` et `tests/quality_checks_gold.sql` dans SSMS. Les commentaires de ces fichiers précisent les résultats attendus pour chaque contrôle.
+
+## Structure du dépôt
+
+```text
+.
+├── datasets/
+│   ├── source_crm/             # Fichiers CSV du CRM
+│   └── source_erp/             # Fichiers CSV de l’ERP
+├── docs/
+│   ├── data_catalog.md
+│   ├── naming_conventions.md
+│   ├── ETL.png
+│   ├── data_architecture.png
+│   ├── data_flow.png
+│   ├── data_integration.png
+│   ├── data_model.png
+│   ├── data_layers.pdf
+│   └── Project_Notes_Sketches.pdf
+├── scripts/
+│   ├── init_database.sql
+│   ├── bronze/
+│   ├── silver/
+│   └── gold/
+├── tests/
+│   ├── quality_checks_silver.sql
+│   └── quality_checks_gold.sql
+├── LICENSE
+└── README.md
+```
+
+## Documentation
+
+- [Catalogue des données Gold](docs/data_catalog.md)
+- [Conventions de nommage](docs/naming_conventions.md)
+- [Architecture des données](docs/data_architecture.png)
+- [Flux de données](docs/data_flow.png)
+
+## Inspiration et crédits
+
+Projet inspiré par les ressources pédagogiques de [Data With Baraa sur YouTube](https://www.youtube.com/@datawithbaraa). Merci à Baraa pour le contenu qui m’a aidée à apprendre et à réaliser ce projet.

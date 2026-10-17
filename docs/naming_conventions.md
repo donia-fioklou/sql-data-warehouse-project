@@ -1,81 +1,55 @@
-# **Naming Conventions**
+# Conventions de nommage
 
-This document outlines the naming conventions used for schemas, tables, views, columns, and other objects in the data warehouse.
+Ce document décrit les conventions utilisées dans les schémas et scripts SQL de ce projet.
 
-## **Table of Contents**
+## Principes généraux
 
-1. [General Principles](#general-principles)
-2. [Table Naming Conventions](#table-naming-conventions)
-   - [Bronze Rules](#bronze-rules)
-   - [Silver Rules](#silver-rules)
-   - [Gold Rules](#gold-rules)
-3. [Column Naming Conventions](#column-naming-conventions)
-   - [Surrogate Keys](#surrogate-keys)
-   - [Technical Columns](#technical-columns)
-4. [Stored Procedure](#stored-procedure-naming-conventions)
----
+- Les noms d’objets SQL sont en anglais et en minuscules.
+- Les mots sont séparés par des tirets bas (`snake_case`).
+- Les noms doivent décrire clairement l’objet et éviter les mots réservés de SQL.
+- Les schémas de données suivent les couches `bronze`, `silver` et `gold`.
 
-## **General Principles**
+## Tables et vues
 
-- **Naming Conventions**: Use snake_case, with lowercase letters and underscores (`_`) to separate words.
-- **Language**: Use English for all names.
-- **Avoid Reserved Words**: Do not use SQL reserved words as object names.
+### Bronze
 
-## **Table Naming Conventions**
+Les noms reprennent le système source et le nom de l’entité, selon le format `<source>_<entite>`. Les préfixes utilisés ici sont `crm` et `erp`.
 
-### **Bronze Rules**
-- All names must start with the source system name, and table names must match their original names without renaming.
-- **`<sourcesystem>_<entity>`**  
-  - `<sourcesystem>`: Name of the source system (e.g., `crm`, `erp`).  
-  - `<entity>`: Exact table name from the source system.  
-  - Example: `crm_customer_info` → Customer information from the CRM system.
+Exemples : `bronze.crm_cust_info`, `bronze.erp_cust_az12`.
 
-### **Silver Rules**
-- All names must start with the source system name, and table names must match their original names without renaming.
-- **`<sourcesystem>_<entity>`**  
-  - `<sourcesystem>`: Name of the source system (e.g., `crm`, `erp`).  
-  - `<entity>`: Exact table name from the source system.  
-  - Example: `crm_customer_info` → Customer information from the CRM system.
+### Silver
 
-### **Gold Rules**
-- All names must use meaningful, business-aligned names for tables, starting with the category prefix.
-- **`<category>_<entity>`**  
-  - `<category>`: Describes the role of the table, such as `dim` (dimension) or `fact` (fact table).  
-  - `<entity>`: Descriptive name of the table, aligned with the business domain (e.g., `customers`, `products`, `sales`).  
-  - Examples:
-    - `dim_customers` → Dimension table for customer data.  
-    - `fact_sales` → Fact table containing sales transactions.  
+Les noms conservent la correspondance avec les entités de la source afin de faciliter le suivi des transformations. Les noms restent alignés sur ceux de Bronze.
 
-#### **Glossary of Category Patterns**
+Exemples : `silver.crm_sales_details`, `silver.erp_loc_a101`.
 
-| Pattern     | Meaning                           | Example(s)                              |
-|-------------|-----------------------------------|-----------------------------------------|
-| `dim_`      | Dimension table                  | `dim_customer`, `dim_product`           |
-| `fact_`     | Fact table                       | `fact_sales`                            |
-| `report_`   | Report table                     | `report_customers`, `report_sales_monthly`   |
+### Gold
 
-## **Column Naming Conventions**
+Les noms indiquent le rôle analytique de la vue, puis le domaine métier :
 
-### **Surrogate Keys**  
-- All primary keys in dimension tables must use the suffix `_key`.
-- **`<table_name>_key`**  
-  - `<table_name>`: Refers to the name of the table or entity the key belongs to.  
-  - `_key`: A suffix indicating that this column is a surrogate key.  
-  - Example: `customer_key` → Surrogate key in the `dim_customers` table.
-  
-### **Technical Columns**
-- All technical columns must start with the prefix `dwh_`, followed by a descriptive name indicating the column's purpose.
-- **`dwh_<column_name>`**  
-  - `dwh`: Prefix exclusively for system-generated metadata.  
-  - `<column_name>`: Descriptive name indicating the column's purpose.  
-  - Example: `dwh_load_date` → System-generated column used to store the date when the record was loaded.
- 
-## **Stored Procedure**
+- `dim_<entite>` pour une dimension ;
+- `fact_<entite>` pour une table de faits.
 
-- All stored procedures used for loading data must follow the naming pattern:
-- **`load_<layer>`**.
-  
-  - `<layer>`: Represents the layer being loaded, such as `bronze`, `silver`, or `gold`.
-  - Example: 
-    - `load_bronze` → Stored procedure for loading data into the Bronze layer.
-    - `load_silver` → Stored procedure for loading data into the Silver layer.
+Exemples utilisés dans le projet : `gold.dim_customers`, `gold.dim_products` et `gold.fact_sales`.
+
+## Colonnes
+
+### Clés de substitution
+
+Les clés de substitution des dimensions se terminent par `_key`. Dans les vues Gold, elles sont calculées avec `ROW_NUMBER()`.
+
+Exemples : `customer_key`, `product_key`.
+
+### Colonnes techniques
+
+Les colonnes de métadonnées générées par l’entrepôt commencent par `dwh_`, suivi d’un nom descriptif.
+
+Exemple : `dwh_create_date`, qui indique la date et l’heure de création de l’enregistrement dans la couche Silver.
+
+## Procédures de chargement
+
+Les procédures de chargement suivent le format `load_<couche>` et sont placées dans le schéma correspondant à la couche chargée.
+
+Exemples : `bronze.load_bronze` et `silver.load_silver`.
+
+La couche Gold de ce projet est composée de vues créées par `scripts/gold/ddl_gold.sql` ; elle n’a pas de procédure de chargement dédiée.
