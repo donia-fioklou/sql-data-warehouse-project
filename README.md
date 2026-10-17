@@ -2,7 +2,7 @@
 
 > Projet personnel d’apprentissage en ingénierie des données, réalisé avec SQL Server.
 
-**Autrice :** donia-fioklou
+**Auteur :** donia-fioklou
 
 J’ai réalisé ce projet pour apprendre et pratiquer les étapes de construction d’un entrepôt de données : chargement de fichiers CSV, nettoyage et intégration de données, modélisation analytique et contrôles qualité. Le projet s’appuie sur deux sources, CRM et ERP, et organise les données selon les couches Bronze, Silver et Gold.
 
