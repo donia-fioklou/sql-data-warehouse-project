@@ -1,119 +1,77 @@
-# Entrepôt de données SQL — projet de Donia
-
-> Projet personnel d’apprentissage en ingénierie des données, réalisé avec SQL Server.
+# Entrepôt de données SQL Server (CRM + ERP)
 
 **Auteur :** donia-fioklou
 
-J’ai réalisé ce projet pour apprendre et pratiquer les étapes de construction d’un entrepôt de données : chargement de fichiers CSV, nettoyage et intégration de données, modélisation analytique et contrôles qualité. Le projet s’appuie sur deux sources, CRM et ERP, et organise les données selon les couches Bronze, Silver et Gold.
+## Problématique
 
-Cette réalisation s’inspire du projet pédagogique de **Data With Baraa**. Le code et la documentation de ce dépôt correspondent à mon travail d’apprentissage et à mon adaptation du projet.
+Les ventes sont réparties entre un CRM et un ERP, dans des CSV aux formats incohérents (doublons, codes M/F/S, dates en entier, prix et montants incohérents). Comment obtenir un modèle unique et fiable pour analyser clients, produits et ventes ?
 
-## Architecture
+## Solution : une architecture en 3 couches sur SQL Server
 
-Les scripts SQL Server mettent en place trois couches :
+```mermaid
+flowchart LR
+    CRM[CSV CRM] --> B[Bronze<br/>BULK INSERT]
+    ERP[CSV ERP] --> B
+    B --> S[Silver<br/>nettoyage T-SQL]
+    S --> G[Gold<br/>vues en étoile]
+```
 
-1. **Bronze** — chargement des CSV sources sans transformation métier majeure.
-2. **Silver** — nettoyage, standardisation et harmonisation des données CRM et ERP.
-3. **Gold** — trois vues analytiques organisées en modèle en étoile : `dim_customers`, `dim_products` et `fact_sales`.
+### Bronze : charger les CSV tels quels
 
-![Architecture des données](docs/data_architecture.png)
+- **Problème :** les sources sont des fichiers plats, et un rechargement ne doit pas dupliquer les données.
+- **Solution :** tables `bronze.*` identiques aux CSV, remplies par la procédure `bronze.load_bronze` (`TRUNCATE` puis `BULK INSERT`), avec durée de chargement et gestion d’erreurs `TRY/CATCH`.
 
-Le flux des données est illustré dans [le diagramme de flux](docs/data_flow.png). Le détail des colonnes Gold est disponible dans le [catalogue de données](docs/data_catalog.md).
+### Silver : corriger les données
 
-## Ce que contient le projet
+La procédure `silver.load_silver` applique ces corrections :
 
-- Une base SQL Server créée avec les schémas `bronze`, `silver` et `gold`.
-- Des tables Bronze et Silver pour les fichiers CRM et ERP.
-- Des procédures de chargement Bronze et Silver, avec transformations et standardisations dans Silver.
-- Des vues Gold pour l’analyse des clients, des produits et des ventes.
-- Des requêtes de contrôle qualité pour les couches Silver et Gold.
-- Des notes et diagrammes de conception dans `docs/`.
+| Problème constaté | Technique SQL |
+|---|---|
+| Plusieurs lignes par client | `ROW_NUMBER() OVER (PARTITION BY cst_id ORDER BY cst_create_date DESC)` pour garder la plus récente |
+| Codes `M`, `F`, `S`, `R`, `T`… | `CASE` + `UPPER(TRIM())` vers des libellés lisibles, `n/a` si inconnu |
+| Clé produit qui mélange catégorie et produit | `SUBSTRING` / `REPLACE` pour extraire `cat_id` et `prd_key` |
+| Historique de prix sans date de fin | `LEAD()` pour calculer `prd_end_dt` à partir de la date de début suivante |
+| Dates stockées en entier (`20240131`) ou à `0` | Conversion en `DATE`, `NULL` si invalide |
+| Montant, quantité et prix incohérents | Recalcul de `sales = quantity × price` ou du prix quand une valeur est absente ou négative |
+| Identifiants ERP différents du CRM (`NAS…`, tirets) | `SUBSTRING` / `REPLACE` pour aligner les clés |
+| Dates de naissance futures | Remplacées par `NULL` |
+| Pays codés de façon hétérogène (`DE`, `US`, `USA`, vide) | Normalisation en noms complets ou `n/a` |
 
-Le modèle Gold est destiné à faciliter les analyses de ventes, de produits et de clients. Ce dépôt ne contient pas de tableau de bord BI ni de rapports d’analyse prêts à l’emploi.
+### Gold : exposer un modèle d’analyse
 
-## Technologies et prérequis
+- **Problème :** les analystes ne doivent pas réécrire les jointures CRM/ERP.
+- **Solution :** trois vues dans `scripts/gold/ddl_gold.sql`.
+  - `gold.dim_customers` : CRM + ERP (naissance, pays), avec genre ERP en repli quand le CRM est inconnu.
+  - `gold.dim_products` : produits actuels uniquement (`prd_end_dt IS NULL`), enrichis par catégorie et sous-catégorie ERP.
+  - `gold.fact_sales` : ventes reliées aux dimensions par des clés de substitution générées avec `ROW_NUMBER()`.
 
-- Microsoft SQL Server.
-- SQL Server Management Studio (SSMS), ou un outil compatible pour exécuter les scripts T-SQL.
-- Accès en lecture aux fichiers CSV depuis le service SQL Server pour utiliser `BULK INSERT`.
+```mermaid
+erDiagram
+    dim_customers ||--o{ fact_sales : customer_key
+    dim_products ||--o{ fact_sales : product_key
+```
 
-## Exécution
+Le détail des colonnes est dans le [catalogue de données](docs/data_catalog.md) ; les règles de nommage sont dans les [conventions](docs/naming_conventions.md).
 
-### 1. Vérifier les chemins des CSV
+## Exécution rapide
 
-La procédure `bronze.load_bronze`, dans `scripts/bronze/proc_load_bronze.sql`, contient des chemins absolus propres à une machine. Avant de la créer ou de l’exécuter, remplace ces chemins par ceux des fichiers CSV dans ton environnement. Le compte de service SQL Server doit pouvoir lire ces fichiers.
-
-### 2. Créer la base et les objets
-
-Dans SSMS, exécute les scripts dans cet ordre :
-
-1. `scripts/init_database.sql`
-2. `scripts/bronze/ddl_bronze.sql`
-3. `scripts/silver/ddl_silver.sql`
-4. `scripts/bronze/proc_load_bronze.sql`
-5. `scripts/silver/proc_load_silver.sql`
-6. `scripts/gold/ddl_gold.sql`
-
-> **Attention :** `scripts/init_database.sql` supprime puis recrée la base `DataWarehouse` si elle existe déjà. Cette opération efface les données qu’elle contient.
-
-### 3. Charger les données
-
-Après avoir configuré les chemins CSV, exécute les procédures dans l’ordre :
+1. Dans `scripts/bronze/proc_load_bronze.sql`, remplacer les chemins absolus des CSV par ceux de votre machine.
+2. Exécuter dans SSMS, dans cet ordre :
+   `scripts/init_database.sql`, `scripts/bronze/ddl_bronze.sql`, `scripts/silver/ddl_silver.sql`, `scripts/bronze/proc_load_bronze.sql`, `scripts/silver/proc_load_silver.sql`, `scripts/gold/ddl_gold.sql`.
+3. Charger les données :
 
 ```sql
 EXEC bronze.load_bronze;
 EXEC silver.load_silver;
+SELECT TOP (10) * FROM gold.fact_sales;
 ```
 
-Les vues Gold sont définies dans `scripts/gold/ddl_gold.sql`. Une fois les couches chargées, tu peux les interroger, par exemple :
+> `init_database.sql` supprime et recrée la base `DataWarehouse`.
 
-```sql
-SELECT TOP (10) *
-FROM gold.fact_sales;
-```
+## Vérification de la qualité
 
-Les procédures vident leurs tables cibles avant chaque chargement. Relancer un chargement remplace donc les données déjà présentes dans la couche concernée.
+Les scripts [quality_checks_silver.sql](tests/quality_checks_silver.sql) et [quality_checks_gold.sql](tests/quality_checks_gold.sql) contrôlent les doublons de clés, les espaces parasites, la cohérence des dates et des montants, l’unicité des clés de substitution et l’intégrité des jointures entre faits et dimensions.
 
-### 4. Vérifier la qualité des données
+## Crédit
 
-Après les chargements, exécute les requêtes de `tests/quality_checks_silver.sql` et `tests/quality_checks_gold.sql` dans SSMS. Les commentaires de ces fichiers précisent les résultats attendus pour chaque contrôle.
-
-## Structure du dépôt
-
-```text
-.
-├── datasets/
-│   ├── source_crm/             # Fichiers CSV du CRM
-│   └── source_erp/             # Fichiers CSV de l’ERP
-├── docs/
-│   ├── data_catalog.md
-│   ├── naming_conventions.md
-│   ├── ETL.png
-│   ├── data_architecture.png
-│   ├── data_flow.png
-│   ├── data_integration.png
-│   ├── data_model.png
-│   ├── data_layers.pdf
-│   └── Project_Notes_Sketches.pdf
-├── scripts/
-│   ├── init_database.sql
-│   ├── bronze/
-│   ├── silver/
-│   └── gold/
-├── tests/
-│   ├── quality_checks_silver.sql
-│   └── quality_checks_gold.sql
-├── LICENSE
-└── README.md
-```
-
-## Documentation
-
-- [Catalogue des données Gold](docs/data_catalog.md)
-- [Conventions de nommage](docs/naming_conventions.md)
-- [Architecture des données](docs/data_architecture.png)
-- [Flux de données](docs/data_flow.png)
-
-## Inspiration et crédits
-
-Projet inspiré par les ressources pédagogiques de [Data With Baraa sur YouTube](https://www.youtube.com/@datawithbaraa). Merci à Baraa pour le contenu qui m’a aidée à apprendre et à réaliser ce projet.
+Projet réalisé en m’appuyant sur la formation de [Data With Baraa](https://www.youtube.com/@datawithbaraa).
